@@ -100,15 +100,17 @@ def train_model(
                 with torch.autocast(device.type if device.type != 'mps' else 'cpu', enabled=amp):
                     masks_pred = model(images)
                     if model.n_classes == 1:
-                        loss = criterion(masks_pred.squeeze(1), true_masks.float())
-                        loss += dice_loss(F.sigmoid(masks_pred.squeeze(1)), true_masks.float(), multiclass=False)
+                        criterion_loss = criterion(masks_pred.squeeze(1), true_masks.float())
+                        dicelossy = dice_loss(F.sigmoid(masks_pred.squeeze(1)), true_masks.float(), multiclass=False)
+                        loss = criterion_loss + dicelossy
                     else:
-                        loss = criterion(masks_pred, true_masks)
-                        loss += dice_loss(
+                        criterion_loss = criterion(masks_pred, true_masks)
+                        dicelossy = dice_loss(
                             F.softmax(masks_pred, dim=1).float(),
                             F.one_hot(true_masks, model.n_classes).permute(0, 3, 1, 2).float(),
                             multiclass=True
                         )
+                        loss = criterion_loss + dicelossy
 
                 optimizer.zero_grad(set_to_none=True)
                 grad_scaler.scale(loss).backward()
@@ -125,7 +127,7 @@ def train_model(
                     'step': global_step,
                     'epoch': epoch
                 })
-                pbar.set_postfix(**{'loss (batch)': loss.item()})
+                pbar.set_postfix(**{'loss (batch)': loss.item(), 'criterion_loss': criterion_loss.item(), 'jac_loss': dicelossy.item()})
 
                 # Evaluation round
                 division_step = (n_train // (5 * batch_size))
