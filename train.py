@@ -77,7 +77,16 @@ def train_model(
     optimizer = optim.RMSprop(model.parameters(),
                               lr=learning_rate, weight_decay=weight_decay, momentum=momentum, foreach=True)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=5)  # goal: maximize Dice score
-    grad_scaler = torch.cuda.amp.GradScaler(enabled=amp)
+    grad_scaler = torch.cuda.amp.GradScaler(
+        enabled=amp
+        loss_scale="dynamic"
+    # DLS optimizer (loss_scale=='dynamic')
+    initial_loss_scale=2e15,
+    steps_per_increase=2000,
+    min_loss_scale=2e-14,
+    max_loss_scale=2e15,
+    #max_gradient_norm=...,
+        )
     criterion = nn.CrossEntropyLoss() if model.n_classes > 1 else nn.BCEWithLogitsLoss()
     global_step = 0
 
